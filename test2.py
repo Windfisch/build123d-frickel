@@ -100,7 +100,7 @@ def auto_finger_joint(
 
 def servo_horn_mount():
     a = Loc((-6, 0)) * Circle(7)
-    b = Loc((20,0)) * Rectangle(22,20, align=LC)
+    b = Loc((20,0)) * Rectangle(24,20, align=LC)
     c = make_hull([a.edges(),b.edges()])
     holes = Location((-9,0)) * SlotCenterToCenter(2.3, 1.7)
     holes += Location((14,0)) * SlotCenterToCenter(2.3, 1.7)
@@ -128,8 +128,11 @@ def servo_hip_mount():
     round = 4
     servo_xlen = 22.7
     servo_ylen = 12.0
+
+    yextra = 12
+
     
-    base = Loc((-d,0)) * (RRect(d + servo_xlen + 5, servo_ylen + 8, round, align = LC) + Rect(round + 0.1, servo_ylen + 8, align = LC))
+    base = Loc((-d,0)) * (RRect(d + servo_xlen + 5, servo_ylen + yextra, round, align = LC) + Rect(round + 0.1, servo_ylen + yextra, align = LC))
     base -= RRect(servo_xlen, servo_ylen, 0.5, align=LC)
 
     base = extrude(base, 3)
@@ -159,6 +162,7 @@ def tri():
 
     return tri
 
+x,y,t1,t2 = None,None,None,None
     
 
 x = servo_horn_mount()
@@ -171,13 +175,19 @@ x.joints['hip_servo_mount'].connect_to(y.joints['attach'])
 y.joints['tri1'].connect_to(t1.joints['attach'])
 y.joints['tri2'].connect_to(t2.joints['attach'])
 
+xtrans = x.location.inverse()
+ytrans = y.location.inverse()
+t1trans = t1.location.inverse()
+t2trans = t2.location.inverse()
+
+
 finger = auto_finger_joint
 
 x, y = finger(x, y, 3)
-x, t1 = finger(x, t1, 3)
-x, t2 = finger(x, t2, 3)
-y, t1 = finger(y, t1, 3)
-y, t2 = finger(y, t2, 3)
+x, t1 = finger(x, t1, 3, swap=True)
+x, t2 = finger(x, t2, 3, swap=True)
+y, t1 = finger(y, t1, 3, swap=True)
+y, t2 = finger(y, t2, 3, swap=True)
 
 x.color='red'
 y.color='blue'
@@ -188,16 +198,22 @@ t1.name = 'tri1'
 t2.name = 'tri2'
 
 
-show(x,y,t1,t2)
-#a1 = RigidJoint("a1", a, Plane(a.faces().sort_by(Axis.Z)[-1]).location)
-#a2 = RigidJoint("a2", a, -Plane(a.faces().sort_by(Axis.Z)[0]).location)
-#b1 = RigidJoint("b1", b, Plane(b.faces().sort_by(Axis.Z)[-1]).location)
-#b2 = RigidJoint("b2", b, -Plane(b.faces().sort_by(Axis.Z)[0]).location)
-#c1 = RigidJoint("c1", c, Plane(c.faces().sort_by(Axis.Z)[-1]).location)
-#c2 = RigidJoint("c2", c, -Plane(c.faces().sort_by(Axis.Z)[0]).location)
+x.location = Loc((0,30,0)) * xtrans
+y.location = ytrans
+t1.location = Loc((50,-10,0)) * t1trans
+t2.location = Loc((50,20,0)) * t2trans
 
-#c2.connect_to(b1)
-#b2.connect_to(a1)
 
-#show(a,b,c)
-# %%
+part = x+y+t1+t2
+
+part2d = section(part, Plane.XY)
+
+show(part2d)
+
+for f in part2d.faces():
+    
+
+exporter = ExportSVG(scale=1)
+exporter.add_layer("Visible")
+exporter.add_shape(part2d, layer="Visible")
+exporter.write("part_projection.svg")
