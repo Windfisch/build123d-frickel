@@ -10,6 +10,9 @@ Rot = Rotation
 Rect = Rectangle
 RRect = RectangleRounded
 
+def rot2d(angle):
+    return Rotation(0,0,angle)
+
 for x,xx in [('L', Align.MIN), ('C', Align.CENTER), ('H', Align.MAX)]:
     for y,yy in [('L', Align.MIN), ('C', Align.CENTER), ('H', Align.MAX)]:
         globals()[x+y] = (xx, yy)
@@ -99,12 +102,14 @@ def auto_finger_joint(
 
 
 def servo_horn_mount():
-    a = Loc((-6, 0)) * Circle(7)
-    b = Loc((20,0)) * Rectangle(24,20, align=LC)
+    a = Loc((-3, 0)) * Circle(10)
+    b = Loc((14,0)) * Rectangle(24,20, align=LC)
     c = make_hull([a.edges(),b.edges()])
-    holes = Location((-9,0)) * SlotCenterToCenter(2.3, 1.7)
-    holes += Location((14,0)) * SlotCenterToCenter(2.3, 1.7)
-    holes += RRect(10, 8, 1)
+    holes = Location((-8.5,0)) * SlotCenterToCenter(1.3, 2.1)
+    holes += Location((8.5,0)) * SlotCenterToCenter(1.3, 2.1)
+    holes += Location((0,7)) * rot2d(90) * SlotCenterToCenter(1.3, 2.1)
+    holes += Location((0,-7)) * rot2d(90) * SlotCenterToCenter(1.3, 2.1)
+    holes += RRect(10, 7.7, 1)
 
     r = c - holes
 
@@ -126,14 +131,17 @@ def servo_horn_mount():
 def servo_hip_mount():
     d = 12
     round = 4
-    servo_xlen = 22.7
+    servo_xlen = 23
     servo_ylen = 12.0
+    screw_spacing = 28
 
     yextra = 12
 
     
     base = Loc((-d,0)) * (RRect(d + servo_xlen + 5, servo_ylen + yextra, round, align = LC) + Rect(round + 0.1, servo_ylen + yextra, align = LC))
     base -= RRect(servo_xlen, servo_ylen, 0.5, align=LC)
+    base -= Loc((servo_xlen/2 -screw_spacing/2,0)) * Circle(1.5/2)
+    base -= Loc((servo_xlen/2 +screw_spacing/2,0)) * Circle(1.5/2)
 
     base = extrude(base, 3)
 
@@ -153,9 +161,9 @@ def servo_hip_mount():
 def tri():
     xlen = 30
     ylen = 17
-    tol = 1
+    tol = 3
     
-    tri = Triangle(a=xlen-tol, c=ylen-tol, B = 90, align = LL) + Rect(xlen-tol, 3+tol, align=LH) + Rect(3+tol, ylen-tol, align = HL)
+    tri = Triangle(a=xlen-tol, c=ylen-tol, B = 90, align = LL) + Rect(xlen-tol, 3+tol, align=LH) + Rect(3+tol, ylen-tol, align = HL) + Rect(tol, tol, align = HH)
     tri = Loc((tol, tol)) * tri
     tri = extrude(tri, 3/2, both=True)
     j = RigidJoint("attach", tri, Loc((-3,-3,0), (0,0,0)))
@@ -185,7 +193,7 @@ finger = auto_finger_joint
 
 x, y = finger(x, y, 3)
 x, t1 = finger(x, t1, 3, swap=True)
-x, t2 = finger(x, t2, 3, swap=True)
+x, t2 = finger(x, t2, 3, swap=False)
 y, t1 = finger(y, t1, 3, swap=True)
 y, t2 = finger(y, t2, 3, swap=True)
 
@@ -196,6 +204,8 @@ x.name = 'leg_servo_horn'
 y.name = 'hip_servo_mount'
 t1.name = 'tri1'
 t2.name = 'tri2'
+
+show(x,y,t1,t2)
 
 
 x.location = Loc((0,30,0)) * xtrans
@@ -208,10 +218,7 @@ part = x+y+t1+t2
 
 part2d = section(part, Plane.XY)
 
-show(part2d)
-
-for f in part2d.faces():
-    
+#show(part2d)
 
 exporter = ExportSVG(scale=1)
 exporter.add_layer("Visible")
