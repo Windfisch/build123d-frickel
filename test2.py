@@ -19,12 +19,14 @@ for x,xx in [('L', Align.MIN), ('C', Align.CENTER), ('H', Align.MAX)]:
         for z,zz in [('L', Align.MIN), ('C', Align.CENTER), ('H', Align.MAX)]:
             globals()[x+y+z] = (xx, yy, zz)
 
-set_defaults(black_edges=True, render_joints=True, render_edges=True, reset_camera=False, default_opacity=1)
+set_defaults(black_edges=True, render_joints=True, render_edges=True, reset_camera=False, default_opacity=0.7)
 
 
 # %%
 
 from enum import Enum, auto
+
+THICK = 3.1
 
 # auto_finger_joint code taken from ZTKF
 
@@ -113,7 +115,7 @@ def servo_horn_mount():
 
     r = c - holes
 
-    r = extrude(r, 3)
+    r = extrude(r, THICK)
 
     joint_point = (
         r.faces().filter_by(Plane.XZ).sort_by(Axis.Y)[0]
@@ -143,45 +145,135 @@ def servo_hip_mount():
     base -= Loc((servo_xlen/2 -screw_spacing/2,0)) * Circle(1.5/2)
     base -= Loc((servo_xlen/2 +screw_spacing/2,0)) * Circle(1.5/2)
 
-    base = extrude(base, 3)
+    base = extrude(base, THICK)
 
     joint_loc = base.vertices().group_by(Axis.X)[0].group_by(Axis.Y)[0].sort_by(Axis.Z)[0]
     print(joint_loc)
 
-    tri1_loc = Vector(joint_loc + (0,3/2,0))
+    tri1_loc = Vector(joint_loc + (0,THICK/2,0))
     tri2_loc = tri1_loc.__copy__()
     tri2_loc.Y *= -1
+    servo_loc = Vector(servo_xlen/2, 0, THICK)
 
-    j1 = RigidJoint("attach", base, Loc(joint_loc, (0,90,90)))
-    j2 = RigidJoint("tri1", base, Loc(tri1_loc, (90,0,0)))
-    j2 = RigidJoint("tri2", base, Loc(tri2_loc, (90,0,0)))
+    RigidJoint("attach", base, Loc(joint_loc, (0,90,90)))
+    RigidJoint("tri1", base, Loc(tri1_loc, (90,0,0)))
+    RigidJoint("tri2", base, Loc(tri2_loc, (90,0,0)))
+    RigidJoint("servo", base, Loc(servo_loc, (180,0,180)))
 
     return base
 
 def tri():
     xlen = 30
     ylen = 17
-    tol = 3
+    tol = 2
     
-    tri = Triangle(a=xlen-tol, c=ylen-tol, B = 90, align = LL) + Rect(xlen-tol, 3+tol, align=LH) + Rect(3+tol, ylen-tol, align = HL) + Rect(tol, tol, align = HH)
+    tri = (
+        Triangle(a=xlen-tol, c=ylen-tol, B = 90, align = LL)
+        + Rect(xlen-tol, THICK+tol, align=LH)
+        + Rect(THICK+tol, ylen-tol, align = HL)
+        + Rect(tol, tol, align = HH)
+        - Loc((xlen-2*tol,-tol)) * Rect(tol, THICK, align = LH)
+        - Loc((-tol, ylen-2*tol)) * Rect(THICK, tol, align = HL)
+    )
     tri = Loc((tol, tol)) * tri
-    tri = extrude(tri, 3/2, both=True)
-    j = RigidJoint("attach", tri, Loc((-3,-3,0), (0,0,0)))
+    tri = extrude(tri, THICK/2, both=True)
+    j = RigidJoint("attach", tri, Loc((-THICK,-THICK,0), (0,0,0)))
 
     return tri
 
-x,y,t1,t2 = None,None,None,None
+
+def servo():
+    body_xlen = 23
+    body_ylen = 12.5
+    body_zlen = 24
     
+    hole_xdist = 27.7
+
+    flange_xlen = 34
+    flange_zlen = 2.5
+    flange_zdist_bottom = 17.3
+
+    axis_offcenter = 5.5
+
+    result = extrude(Rect(body_xlen, body_ylen), body_zlen)
+    flange = extrude(
+        Rect(flange_xlen, body_ylen)
+        - Loc((-hole_xdist/2,0)) * (Circle(3/2) + Rect(99, 1.2, align=HC))
+        - Loc((+hole_xdist/2,0)) * (Circle(3/2) + Rect(99, 1.2, align=LC)),
+        flange_zlen
+    )
+    flange = Loc((0,0,flange_zdist_bottom)) * flange
+    result += flange
+
+    topaxis = Plane(Loc((-axis_offcenter,0,0)) * result.faces().sort_by(Axis.Z)[-1].center_location)
+
+    result += extrude( topaxis * Circle(11.15/2), 4)
+    result += extrude( topaxis * Circle(5/2), 6.5)
+    result += extrude( topaxis * Loc((11.15/2 + 3.35,0)) * Circle(2.75, align=HC), 4)
+
+    RigidJoint("mount", result, flange.faces().sort_by(Axis.Z)[-1].center_location)
+    RevoluteJoint("horn_master", result, Axis(result.faces().sort_by(Axis.Z)[-1].center_location.position, (0,0,1)))
+    RigidJoint("horn_slave", result, result.faces().sort_by(Axis.Z)[-1].center_location)
+
+    result.name="sg90 servo"
+    result.color="#5599ffb0"
+
+    return result
+
+def servo_horn():
+    xlen = 36
+
+    end_r = 2
+    mid_r = 7.5 / 2
+
+    base = Circle(mid_r) + Loc((-xlen/2 +end_r,0)) * Circle(end_r) + Loc((xlen/2-end_r,0)) * Circle(end_r)
+    base = make_hull(base.edges())
+    
+    hole_spacing = 2.5
+    outer_hole_dist = 32
+    hole_diam = 1.3
+    n_holes = 5
+
+    for i in range(n_holes):
+        base -= Loc((outer_hole_dist/2 - i * hole_spacing,0)) * Circle(hole_diam/2)
+        base -= Loc((-outer_hole_dist/2 + i * hole_spacing,0)) * Circle(hole_diam/2)
+    
+    base -= Circle(1.2)
+    
+    result = extrude(base, 2)
+    pos = (0,0,1)
+    RigidJoint('slave', result, Loc(pos, (0,0,1)))
+    RevoluteJoint('master', result, Axis(pos, (0,0,1)))
+    RigidJoint('mount', result, Loc((0,0,2), (0,0,0)))
+
+    result.name = "servo horn"
+    result.color = "#ffffffd0"
+
+    return result
+
+
+
+
+x,y,t1,t2 = None,None,None,None
 
 x = servo_horn_mount()
 y = Rot((90,0,90)) * servo_hip_mount()
 t1 = tri()
 t2 = tri()
 
+servo1 = servo()
+servo2 = servo()
+horn1 = servo_horn()
+
 x.joints['hip_servo_mount'].connect_to(y.joints['attach'])
+x.joints['knee_servo_horn'].connect_to(horn1.joints['mount'], angle=0)
+
+horn1.joints['master'].connect_to(servo2.joints['horn_slave'], angle=180+30)
 
 y.joints['tri1'].connect_to(t1.joints['attach'])
 y.joints['tri2'].connect_to(t2.joints['attach'])
+
+y.joints['servo'].connect_to(servo1.joints['mount'])
 
 xtrans = x.location.inverse()
 ytrans = y.location.inverse()
@@ -193,7 +285,7 @@ finger = auto_finger_joint
 
 x, y = finger(x, y, 3)
 x, t1 = finger(x, t1, 3, swap=True)
-x, t2 = finger(x, t2, 3, swap=False)
+x, t2 = finger(x, t2, 3, swap=True)
 y, t1 = finger(y, t1, 3, swap=True)
 y, t2 = finger(y, t2, 3, swap=True)
 
@@ -205,22 +297,22 @@ y.name = 'hip_servo_mount'
 t1.name = 'tri1'
 t2.name = 'tri2'
 
-show(x,y,t1,t2)
+show(x,y,t1,t2, servo1, servo2, horn1)
 
 
-x.location = Loc((0,30,0)) * xtrans
-y.location = ytrans
-t1.location = Loc((50,-10,0)) * t1trans
-t2.location = Loc((50,20,0)) * t2trans
+#x.location = Loc((0,30,0)) * xtrans
+#y.location = ytrans
+#t1.location = Loc((50,-10,0)) * t1trans
+#t2.location = Loc((50,20,0)) * t2trans
 
 
-part = x+y+t1+t2
+#part = x+y+t1+t2
 
-part2d = section(part, Plane.XY)
+#part2d = section(part, Plane.XY)
 
 #show(part2d)
 
-exporter = ExportSVG(scale=1)
-exporter.add_layer("Visible")
-exporter.add_shape(part2d, layer="Visible")
-exporter.write("part_projection.svg")
+#exporter = ExportSVG(scale=1)
+#exporter.add_layer("Visible")
+#exporter.add_shape(part2d, layer="Visible")
+#exporter.write("part_projection.svg")
