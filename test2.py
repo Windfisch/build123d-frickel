@@ -27,6 +27,9 @@ set_defaults(black_edges=True, render_joints=True, render_edges=True, reset_came
 from enum import Enum, auto
 
 THICK = 3.1
+servo_xlen = 23
+servo_ylen = 12.0
+
 
 # auto_finger_joint code taken from ZTKF
 
@@ -103,16 +106,22 @@ def auto_finger_joint(
         return (a - fingers_a, b - fingers_b)
 
 
-def servo_horn_mount():
-    a = Loc((-3, 0)) * Circle(10)
-    b = Loc((14,0)) * Rectangle(24,20, align=LC)
-    c = make_hull([a.edges(),b.edges()])
+def make_horn_cutout():
     holes = Location((-8.5,0)) * SlotCenterToCenter(1.3, 2.1)
     holes += Location((8.5,0)) * SlotCenterToCenter(1.3, 2.1)
     holes += Location((0,7)) * rot2d(90) * SlotCenterToCenter(1.3, 2.1)
     holes += Location((0,-7)) * rot2d(90) * SlotCenterToCenter(1.3, 2.1)
     holes += RRect(10, 7.7, 1)
+    return holes
 
+
+def servo_horn_mount():
+    a = Loc((-3, 0)) * Circle(13)
+    b = Loc((16,0)) * Rectangle(24,13*2, align=LC)
+    c = make_hull([a.edges(),b.edges()])
+
+
+    holes = make_horn_cutout()
     r = c - holes
 
     r = extrude(r, THICK)
@@ -130,20 +139,24 @@ def servo_horn_mount():
 
     return r
 
+def make_servo_cutout():
+    screw_spacing = 28
+
+    base = RRect(servo_xlen, servo_ylen, 0.5)
+    base += Loc((-screw_spacing/2,0)) * Circle(1.5/2)
+    base += Loc((+screw_spacing/2,0)) * Circle(1.5/2)
+    return base
+
+
 def servo_hip_mount():
     d = 12
     round = 4
-    servo_xlen = 23
-    servo_ylen = 12.0
-    screw_spacing = 28
 
     yextra = 12
 
     
     base = Loc((-d,0)) * (RRect(d + servo_xlen + 5, servo_ylen + yextra, round, align = LC) + Rect(round + 0.1, servo_ylen + yextra, align = LC))
-    base -= RRect(servo_xlen, servo_ylen, 0.5, align=LC)
-    base -= Loc((servo_xlen/2 -screw_spacing/2,0)) * Circle(1.5/2)
-    base -= Loc((servo_xlen/2 +screw_spacing/2,0)) * Circle(1.5/2)
+    base -= Loc((servo_xlen/2,0)) * make_servo_cutout()
 
     base = extrude(base, THICK)
 
@@ -251,8 +264,26 @@ def servo_horn():
 
     return result
 
+def upper_leg():
+    leg = SlotCenterToCenter(60, 20)
+    leg -= Loc((-20, 0)) * make_servo_cutout()
+    leg -= Loc((20, 0)) * make_servo_cutout()
+    leg = extrude(leg, THICK)
+    RigidJoint("upper", leg, Location((-20,0,0)))
+    RigidJoint("lower", leg, Location((20,0,0), (0,0,180)))
+    return leg
 
+def lower_leg():
+    leg = Loc((-60,0)) * Circle(15/2)
+    leg += Loc((0,0)) * Circle(30/2)
+    leg = make_hull(leg.edges())
+    leg -= make_horn_cutout()
 
+    leg = extrude(leg, THICK)
+
+    RigidJoint("horn", leg, Loc((0,0,0)))
+
+    return leg
 
 x,y,t1,t2 = None,None,None,None
 
@@ -265,15 +296,26 @@ servo1 = servo()
 servo2 = servo()
 horn1 = servo_horn()
 
+knee_servo = servo()
+knee_horn = servo_horn()
+uleg = upper_leg()
+lleg = lower_leg()
+
 x.joints['hip_servo_mount'].connect_to(y.joints['attach'])
 x.joints['knee_servo_horn'].connect_to(horn1.joints['mount'], angle=0)
 
-horn1.joints['master'].connect_to(servo2.joints['horn_slave'], angle=180+30)
+horn1.joints['master'].connect_to(servo2.joints['horn_slave'], angle=180+45)
 
 y.joints['tri1'].connect_to(t1.joints['attach'])
 y.joints['tri2'].connect_to(t2.joints['attach'])
 
 y.joints['servo'].connect_to(servo1.joints['mount'])
+
+servo2.joints['mount'].connect_to(uleg.joints['upper'])
+uleg.joints['lower'].connect_to(knee_servo.joints['mount'])
+knee_servo.joints['horn_master'].connect_to(knee_horn.joints['slave'], angle = 360-90)
+knee_horn.joints['mount'].connect_to(lleg.joints['horn'])
+
 
 xtrans = x.location.inverse()
 ytrans = y.location.inverse()
@@ -285,7 +327,7 @@ finger = auto_finger_joint
 
 x, y = finger(x, y, 3)
 x, t1 = finger(x, t1, 3, swap=True)
-x, t2 = finger(x, t2, 3, swap=True)
+x, t2 = finger(x, t2, 3, swap=False)
 y, t1 = finger(y, t1, 3, swap=True)
 y, t2 = finger(y, t2, 3, swap=True)
 
@@ -297,22 +339,23 @@ y.name = 'hip_servo_mount'
 t1.name = 'tri1'
 t2.name = 'tri2'
 
-show(x,y,t1,t2, servo1, servo2, horn1)
+#show(x,y,t1,t2, servo1, servo2, horn1)
+show(x,y,t1,t2,servo1, servo2, knee_servo, uleg, horn1, knee_horn, lleg)
 
 
-#x.location = Loc((0,30,0)) * xtrans
-#y.location = ytrans
-#t1.location = Loc((50,-10,0)) * t1trans
-#t2.location = Loc((50,20,0)) * t2trans
+x.location = Loc((0,30,0)) * xtrans
+y.location = ytrans
+t1.location = Loc((50,-10,0)) * t1trans
+t2.location = Loc((50,20,0)) * t2trans
 
 
-#part = x+y+t1+t2
+part = x+y+t1+t2 + Loc((130,-5,0)) * upper_leg() + Loc((150,25,0))* lower_leg()
 
-#part2d = section(part, Plane.XY)
+part2d = section(part, Plane.XY)
 
 #show(part2d)
 
-#exporter = ExportSVG(scale=1)
-#exporter.add_layer("Visible")
-#exporter.add_shape(part2d, layer="Visible")
-#exporter.write("part_projection.svg")
+exporter = ExportSVG(scale=1)
+exporter.add_layer("Visible")
+exporter.add_shape(part2d, layer="Visible")
+exporter.write("part_projection.svg")
