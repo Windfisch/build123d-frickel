@@ -286,12 +286,10 @@ def lower_leg():
 
     return leg
 
-x,y,t1,t2 = None,None,None,None
-
-x = servo_horn_mount()
-y = Rot((90,0,90)) * servo_hip_mount()
-t1 = tri()
-t2 = tri()
+hip_lower = servo_horn_mount()
+hip_upper = Rot((90,0,90)) * servo_hip_mount()
+hip_tri1 = tri()
+hip_tri2 = tri()
 
 servo1 = servo()
 servo2 = servo()
@@ -302,15 +300,12 @@ knee_horn = servo_horn()
 uleg = upper_leg()
 lleg = lower_leg()
 
-servo1.joints['mount'].connect_to(y.joints['servo'])
-y.joints['attach'].connect_to(x.joints['hip_servo_mount'])
-x.joints['knee_servo_horn'].connect_to(horn1.joints['mount'], angle=0)
+servo1.joints['mount'].connect_to(hip_upper.joints['servo'])
+hip_upper.joints['attach'].connect_to(hip_lower.joints['hip_servo_mount'])
+hip_lower.joints['knee_servo_horn'].connect_to(horn1.joints['mount'], angle=0)
 
-y.joints['tri1'].connect_to(t1.joints['attach'])
-y.joints['tri2'].connect_to(t2.joints['attach'])
-
-
-
+hip_upper.joints['tri1'].connect_to(hip_tri1.joints['attach'])
+hip_upper.joints['tri2'].connect_to(hip_tri2.joints['attach'])
 
 horn1.joints['master'].connect_to(servo2.joints['horn_slave'], angle=180+45)
 servo2.joints['mount'].connect_to(uleg.joints['upper'])
@@ -319,39 +314,39 @@ knee_servo.joints['horn_master'].connect_to(knee_horn.joints['slave'], angle = 3
 knee_horn.joints['mount'].connect_to(lleg.joints['horn'])
 
 
-xtrans = x.location.inverse()
-ytrans = y.location.inverse()
-t1trans = t1.location.inverse()
-t2trans = t2.location.inverse()
+xtrans = hip_lower.location.inverse()
+ytrans = hip_upper.location.inverse()
+t1trans = hip_tri1.location.inverse()
+t2trans = hip_tri2.location.inverse()
 
 
 finger = auto_finger_joint
 
-x, y = finger(x, y, 3)
-x, t1 = finger(x, t1, 3, swap=True)
-x, t2 = finger(x, t2, 3, swap=False)
-y, t1 = finger(y, t1, 3, swap=True)
-y, t2 = finger(y, t2, 3, swap=True)
+hip_lower, hip_upper = finger(hip_lower, hip_upper, 3)
+hip_lower, hip_tri1 = finger(hip_lower, hip_tri1, 3, swap=True)
+hip_lower, hip_tri2 = finger(hip_lower, hip_tri2, 3, swap=False)
+hip_upper, hip_tri1 = finger(hip_upper, hip_tri1, 3, swap=True)
+hip_upper, hip_tri2 = finger(hip_upper, hip_tri2, 3, swap=True)
 
-x.color='red'
-y.color='blue'
+hip_lower.color='red'
+hip_upper.color='blue'
 
-x.name = 'leg_servo_horn'
-y.name = 'hip_servo_mount'
-t1.name = 'tri1'
-t2.name = 'tri2'
-
-
-show(x,y,t1,t2,servo1, servo2, knee_servo, uleg, horn1, knee_horn, lleg)
+hip_lower.name = 'leg_servo_horn'
+hip_upper.name = 'hip_servo_mount'
+hip_tri1.name = 'tri1'
+hip_tri2.name = 'tri2'
 
 
-x.location = Loc((0,30,0)) * xtrans
-y.location = ytrans
-t1.location = Loc((50,-10,0)) * t1trans
-t2.location = Loc((50,20,0)) * t2trans
+show(hip_lower,hip_upper,hip_tri1,hip_tri2,servo1, servo2, knee_servo, uleg, horn1, knee_horn, lleg)
 
 
-part = x+y+t1+t2 + Loc((130,-5,0)) * upper_leg() + Loc((150,25,0))* lower_leg()
+hip_lower.location = Loc((0,30,0)) * xtrans
+hip_upper.location = ytrans
+hip_tri1.location = Loc((50,-10,0)) * t1trans
+hip_tri2.location = Loc((50,20,0)) * t2trans
+
+
+part = hip_lower+hip_upper+hip_tri1+hip_tri2 + Loc((130,-5,0)) * upper_leg() + Loc((150,25,0))* lower_leg()
 
 part2d = section(part, Plane.XY)
 
