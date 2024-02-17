@@ -302,16 +302,17 @@ knee_horn = servo_horn()
 uleg = upper_leg()
 lleg = lower_leg()
 
-x.joints['hip_servo_mount'].connect_to(y.joints['attach'])
+servo1.joints['mount'].connect_to(y.joints['servo'])
+y.joints['attach'].connect_to(x.joints['hip_servo_mount'])
 x.joints['knee_servo_horn'].connect_to(horn1.joints['mount'], angle=0)
-
-horn1.joints['master'].connect_to(servo2.joints['horn_slave'], angle=180+45)
 
 y.joints['tri1'].connect_to(t1.joints['attach'])
 y.joints['tri2'].connect_to(t2.joints['attach'])
 
-y.joints['servo'].connect_to(servo1.joints['mount'])
 
+
+
+horn1.joints['master'].connect_to(servo2.joints['horn_slave'], angle=180+45)
 servo2.joints['mount'].connect_to(uleg.joints['upper'])
 uleg.joints['lower'].connect_to(knee_servo.joints['mount'])
 knee_servo.joints['horn_master'].connect_to(knee_horn.joints['slave'], angle = 360-90)
@@ -340,7 +341,7 @@ y.name = 'hip_servo_mount'
 t1.name = 'tri1'
 t2.name = 'tri2'
 
-#show(x,y,t1,t2, servo1, servo2, horn1)
+
 show(x,y,t1,t2,servo1, servo2, knee_servo, uleg, horn1, knee_horn, lleg)
 
 
