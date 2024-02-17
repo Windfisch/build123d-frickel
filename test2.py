@@ -26,6 +26,7 @@ set_defaults(black_edges=True, render_joints=True, render_edges=True, reset_came
 
 from enum import Enum, auto
 
+BURN_WIDTH=0.15
 THICK = 3.1
 servo_xlen = 23
 servo_ylen = 12.0
@@ -352,6 +353,8 @@ t2.location = Loc((50,20,0)) * t2trans
 part = x+y+t1+t2 + Loc((130,-5,0)) * upper_leg() + Loc((150,25,0))* lower_leg()
 
 part2d = section(part, Plane.XY)
+
+part2d = offset(part2d, amount=BURN_WIDTH/2)
 
 #show(part2d)
 
