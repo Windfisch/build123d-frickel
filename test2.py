@@ -24,7 +24,7 @@ set_defaults(black_edges=True, render_joints=True, render_edges=True, reset_came
 
 # %%
 
-from enum import Enum, auto
+
 
 BURN_WIDTH=0.15
 THICK = 3.1
@@ -33,7 +33,7 @@ servo_ylen = 12.0
 
 
 # auto_finger_joint code taken from ZTKF
-
+from enum import Enum, auto
 class FingerType(Enum):
     ODD = auto()
     EVEN = auto()
@@ -172,7 +172,7 @@ def servo_hip_mount():
     RigidJoint("attach", base, Loc(joint_loc, (0,90,90)))
     RigidJoint("tri1", base, Loc(tri1_loc, (90,0,0)))
     RigidJoint("tri2", base, Loc(tri2_loc, (90,0,0)))
-    RigidJoint("servo", base, Loc(servo_loc, (180,0,180)))
+    RigidJoint("servo", base, Loc(servo_loc, (180,0,0)))
 
     return base
 
@@ -294,12 +294,79 @@ hip_tri2 = tri()
 servo1 = servo()
 servo2 = servo()
 horn1 = servo_horn()
+horn_top = servo_horn()
 
 knee_servo = servo()
 knee_horn = servo_horn()
 uleg = upper_leg()
 lleg = lower_leg()
 
+
+def make_body():
+    LENGTH = 150
+    LENGTH2 = LENGTH+80
+    sec1a = Loc((30/2,0,0)) * (
+        Box(THICK,LENGTH,40, align=CCH)
+        - Loc((0,-LENGTH/2,0)) * Box(THICK,10,THICK, align=CLH)
+        - Loc((0,LENGTH/2,0)) * Box(THICK,10,THICK, align=CHH)
+    )
+    sec1b = Loc((-30/2,0,0)) * (
+        Box(THICK,LENGTH,40, align=CCH)
+        - Loc((0,-LENGTH/2,0)) * Box(THICK,10,THICK, align=CLH)
+        - Loc((0,LENGTH/2,0)) * Box(THICK,10,THICK, align=CHH)
+    )
+    top = (
+        Box(120,LENGTH2,THICK, align=CCH)
+        - Box(27,110,THICK, align=CCH)
+        - Loc((120/2, LENGTH2/2, 0)) * Box(40,40,THICK, align=HHH)
+        - Loc((120/2, -LENGTH2/2, 0)) * Box(40,40,THICK, align=HLH)
+        - Loc((-120/2, LENGTH2/2, 0)) * Box(40,40,THICK, align=LHH)
+        - Loc((-120/2, -LENGTH2/2, 0)) * Box(40,40,THICK, align=LLH)
+    )
+    sec3 = Loc((0,-LENGTH/2,0)) * (
+        Box(120,THICK,25, align=CLH)
+        +Box(33,THICK,40, align=CLH)
+    )
+    sec4 = Loc((0,LENGTH/2,0)) * (
+        Box(120,THICK,25, align=CHH)
+        +Box(33,THICK,40, align=CHH)
+    )
+    #sec3 = Loc((0,-LENGTH/2,0)) * Box(120,THICK,40, align=CLH)
+    #sec4 = Loc((0,LENGTH/2,0)) * Box(120,THICK,40, align=CHH)
+    bottom = Loc((0,0,-40)) * Box(33, 80, 3, align=CCL)
+
+    sec1a, top = auto_finger_joint(sec1a, top, 12)
+    sec1a, sec3 = auto_finger_joint(sec1a, sec3, 5)
+    sec1b, top = auto_finger_joint(sec1b, top, 12)
+    sec1b, sec3 = auto_finger_joint(sec1b, sec3, 5)
+    top, sec3 = auto_finger_joint(top, sec3, 12)
+    sec1a, sec4 = auto_finger_joint(sec1a, sec4, 5)
+    sec1b, sec4 = auto_finger_joint(sec1b, sec4, 5)
+    top, sec4 = auto_finger_joint(top, sec4, 12)
+    sec1a, bottom = auto_finger_joint(sec1a, bottom, 12)
+    sec1b, bottom = auto_finger_joint(sec1b, bottom, 12)
+
+    head=Loc((0,-LENGTH/2 - 40, 30))* Sphere(40)
+
+    solids = [sec1a, sec1b, top, sec3, sec4, bottom, head]
+
+    joints = [
+        RigidJoint("horn", sec3, Loc((40,-LENGTH/2, -12), (-90,0,0)))
+    ]
+
+    return solids, joints
+
+body_solids, body_joints = make_body()
+
+show(body_solids)
+
+body_joints[0].connect_to(horn_top.joints['mount'])
+
+
+
+
+
+horn_top.joints['master'].connect_to(servo1.joints['horn_slave'], angle=180)
 servo1.joints['mount'].connect_to(hip_upper.joints['servo'])
 hip_upper.joints['attach'].connect_to(hip_lower.joints['hip_servo_mount'])
 hip_lower.joints['knee_servo_horn'].connect_to(horn1.joints['mount'], angle=0)
@@ -336,9 +403,9 @@ hip_upper.name = 'hip_servo_mount'
 hip_tri1.name = 'tri1'
 hip_tri2.name = 'tri2'
 
+show(body_solids,horn_top,hip_lower,hip_upper,hip_tri1,hip_tri2,servo1, servo2, knee_servo, uleg, horn1, knee_horn, lleg)
 
-show(hip_lower,hip_upper,hip_tri1,hip_tri2,servo1, servo2, knee_servo, uleg, horn1, knee_horn, lleg)
-
+# %%
 
 hip_lower.location = Loc((0,30,0)) * xtrans
 hip_upper.location = ytrans
