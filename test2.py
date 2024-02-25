@@ -318,18 +318,22 @@ def make_body():
     top = (
         Box(120,LENGTH2,THICK, align=CCH)
         - Box(27,110,THICK, align=CCH)
-        - Loc((120/2, LENGTH2/2, 0)) * Box(40,40,THICK, align=HHH)
-        - Loc((120/2, -LENGTH2/2, 0)) * Box(40,40,THICK, align=HLH)
-        - Loc((-120/2, LENGTH2/2, 0)) * Box(40,40,THICK, align=LHH)
-        - Loc((-120/2, -LENGTH2/2, 0)) * Box(40,40,THICK, align=LLH)
+        - Loc((120/2, LENGTH2/2, 0)) * Box(43,40,THICK, align=HHH)
+        - Loc((120/2, -LENGTH2/2, 0)) * Box(43,40,THICK, align=HLH)
+        - Loc((-120/2, LENGTH2/2, 0)) * Box(43,40,THICK, align=LHH)
+        - Loc((-120/2, -LENGTH2/2, 0)) * Box(43,40,THICK, align=LLH)
     )
     sec3 = Loc((0,-LENGTH/2,0)) * (
         Box(120,THICK,25, align=CLH)
         +Box(33,THICK,40, align=CLH)
+        -Rot((90,0,0))*extrude(Loc((42,-12)) * make_horn_cutout(), -THICK)
+        -Rot((90,0,0))*extrude(Loc((-42,-12)) * make_horn_cutout(), -THICK)
     )
     sec4 = Loc((0,LENGTH/2,0)) * (
         Box(120,THICK,25, align=CHH)
         +Box(33,THICK,40, align=CHH)
+        -Rot((90,0,0))*extrude(Loc((42,-12)) * make_horn_cutout(), THICK)
+        -Rot((90,0,0))*extrude(Loc((-42,-12)) * make_horn_cutout(), THICK)
     )
     #sec3 = Loc((0,-LENGTH/2,0)) * Box(120,THICK,40, align=CLH)
     #sec4 = Loc((0,LENGTH/2,0)) * Box(120,THICK,40, align=CHH)
@@ -348,15 +352,54 @@ def make_body():
 
     head=Loc((0,-LENGTH/2 - 40, 30))* Sphere(40)
 
-    solids = [sec1a, sec1b, top, sec3, sec4, bottom, head]
+    solids = [sec1a, sec1b, top, sec3, sec4, bottom]
+
 
     joints = [
-        RigidJoint("horn", sec3, Loc((40,-LENGTH/2, -12), (-90,0,0)))
+        RigidJoint("horn", sec3, Loc((42,-LENGTH/2, -12), (-90,0,0))),
+        RigidJoint("horn2", sec3, Loc((-42,-LENGTH/2, -12), (-90,0,0))),
+        RigidJoint("horn3", sec4, Loc((42,LENGTH/2, -12), (-90,180,0))),
+        RigidJoint("horn4", sec4, Loc((-42,LENGTH/2, -12), (-90,180,0))),
     ]
 
     return solids, joints
 
 body_solids, body_joints = make_body()
+
+show(body_solids)
+
+
+def laserify(solid):
+    if isinstance(solid, list):
+        return [laserify(s) for s in solid]
+
+    faces = solid.faces().sort_by(SortBy.AREA)
+    top = faces[-1]
+    bot = faces[-2]
+    thick = (top.center_location.inverse() * bot.center_location).position.Z
+    sec = section(solid, section_by = Plane(top.center_location), height=thick/2)
+    sec = top.center_location.inverse() * sec
+
+    sec = offset(sec, amount=BURN_WIDTH/2)
+
+    return sec
+
+def arrange1d(solids):
+    x = 0
+    result = []
+    for s in solids:
+        print(s)
+        bb = s.bounding_box(1)
+        result.append(Loc((x - bb.min.X, -bb.min.Y)) * s)
+        x += bb.max.X - bb.min.X + 1
+    return result
+
+s = body_solids
+show( arrange1d(laserify(s)))
+#s.bounding_box().
+
+
+# %%
 
 show(body_solids)
 
@@ -380,7 +423,6 @@ uleg.joints['lower'].connect_to(knee_servo.joints['mount'])
 knee_servo.joints['horn_master'].connect_to(knee_horn.joints['slave'], angle = 360-90)
 knee_horn.joints['mount'].connect_to(lleg.joints['horn'])
 
-
 xtrans = hip_lower.location.inverse()
 ytrans = hip_upper.location.inverse()
 t1trans = hip_tri1.location.inverse()
@@ -403,25 +445,35 @@ hip_upper.name = 'hip_servo_mount'
 hip_tri1.name = 'tri1'
 hip_tri2.name = 'tri2'
 
-show(body_solids,horn_top,hip_lower,hip_upper,hip_tri1,hip_tri2,servo1, servo2, knee_servo, uleg, horn1, knee_horn, lleg)
+leg_assembly = [horn_top,hip_lower,hip_upper,hip_tri1,hip_tri2,servo1, servo2, knee_servo, uleg, horn1, knee_horn, lleg]
+
+
+def my_mirror(objs, plane):
+    result = [mirror(o, plane) for o in objs]
+    #result = mirror(objs, plane)
+    for (orig, mirr) in zip(objs, result):
+        mirr.color = orig.color
+        #mirr.name = orig.name
+    return result
+
+leg_assembly2 = my_mirror(leg_assembly, Plane.XZ)
+leg_assembly3 = my_mirror(leg_assembly, Plane.YZ)
+leg_assembly4 = my_mirror(leg_assembly2, Plane.YZ)
+
+
+show(body_solids, leg_assembly, leg_assembly2, leg_assembly3, leg_assembly4)
 
 # %%
 
-hip_lower.location = Loc((0,30,0)) * xtrans
-hip_upper.location = ytrans
-hip_tri1.location = Loc((50,-10,0)) * t1trans
-hip_tri2.location = Loc((50,20,0)) * t2trans
+hip_parts = [hip_lower, hip_upper, hip_tri1, hip_tri2]
 
+part2d = arrange1d(laserify(body_solids + hip_parts + [uleg, lleg]))
 
-part = hip_lower+hip_upper+hip_tri1+hip_tri2 + Loc((130,-5,0)) * upper_leg() + Loc((150,25,0))* lower_leg()
-
-part2d = section(part, Plane.XY)
-
-part2d = offset(part2d, amount=BURN_WIDTH/2)
-
-#show(part2d)
+show(part2d)
 
 exporter = ExportSVG(scale=1)
 exporter.add_layer("Visible")
 exporter.add_shape(part2d, layer="Visible")
 exporter.write("part_projection.svg")
+
+
